@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "AI 对话问题收集器",
+  "version": "1.0.0",
+  "description": "在 AI 对话页面右侧显示所有问题列表，点击可定位到对应消息",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://gemini.google.com/app/*",
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://*.character.ai/*",
+        "https://copilot.microsoft.com/*"
+      ],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "activeTab"
+  ]
+}
