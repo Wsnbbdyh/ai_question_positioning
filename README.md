@@ -18,6 +18,7 @@
 - Anthropic Claude (claude.ai)
 - Character.AI (character.ai)
 - Microsoft Copilot (copilot.microsoft.com)
+- 腾讯元宝 (yuanbao.tencent.com)
 
 ## 安装方法
 

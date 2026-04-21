@@ -18,6 +18,7 @@ A Chrome extension that displays all messages from AI conversations (such as Gem
 - Anthropic Claude (claude.ai)
 - Character.AI (character.ai)
 - Microsoft Copilot (copilot.microsoft.com)
+- Tencent Yuanbao (yuanbao.tencent.com)
 
 ## Installation
 

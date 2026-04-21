@@ -54,6 +54,13 @@
       'copilot.microsoft.com': [
         '[data-testid="message"]',
         'div[class*="message"]'
+      ],
+      // 腾讯元宝 (Tencent Yuanbao)
+      'yuanbao.tencent.com': [
+        'div[data-testid="user-msg"]',
+        'div[data-testid="bot-msg-yuanbao"]',
+        'div[role="presentation"]',
+        'div[class*="message"]'
       ]
     },
     
@@ -77,6 +84,38 @@
   let sidebarVisible = true;
   let themeObserver = null;
   let prefersDarkMql = null;
+  let isDragging = false;
+  let dragOffsetY = 0;
+  let savedPosition = null;
+
+  // 从 localStorage 读取保存的位置
+  function loadSavedPosition() {
+    try {
+      const saved = localStorage.getItem('ai-question-trigger-pos');
+      if (saved) {
+        savedPosition = JSON.parse(saved);
+      }
+    } catch (e) {
+      savedPosition = null;
+    }
+  }
+
+  // 保存位置到 localStorage
+  function savePosition() {
+    if (!openTriggerEl) return;
+    try {
+      const rect = openTriggerEl.getBoundingClientRect();
+      savedPosition = { top: rect.top };
+      localStorage.setItem('ai-question-trigger-pos', JSON.stringify(savedPosition));
+    } catch (e) {}
+  }
+
+  // 应用保存的位置
+  function applySavedPosition() {
+    if (!openTriggerEl || !savedPosition) return;
+    openTriggerEl.style.top = savedPosition.top + 'px';
+    openTriggerEl.style.transform = 'translateX(0) !important';
+  }
 
   // ===== 工具函数 =====
   
@@ -426,11 +465,12 @@
     closeBtn.onmouseout = () => { closeBtn.style.background = '#e53e3e'; };
     closeBtn.onclick = closeSidebar;
 
-    // 创建「打开侧边栏」浮动按钮（关闭后显示在右侧）
+    // 创建「打开侧边栏」浮动按钮（关闭后显示在右侧，可拖动上下移动）
+    loadSavedPosition();
     openTriggerEl = document.createElement('button');
     openTriggerEl.id = 'ai-question-open-trigger';
-    openTriggerEl.innerHTML = '📝 问题列表';
-    openTriggerEl.title = '打开问题列表';
+    openTriggerEl.innerHTML = '📝 问题列表 <span style="font-size:10px;opacity:0.7;margin-left:4px;">⋮⋮</span>';
+    openTriggerEl.title = '打开问题列表（拖动可调整位置）';
     openTriggerEl.style.cssText = `
       position: fixed !important;
       top: 50% !important;
@@ -443,22 +483,71 @@
       border: 1px solid var(--aq-border) !important;
       border-right: none !important;
       border-radius: 8px 0 0 8px !important;
-      cursor: pointer !important;
+      cursor: grab !important;
       font-size: 13px !important;
       font-family: inherit !important;
       box-shadow: -2px 0 12px rgba(0, 0, 0, 0.3) !important;
       display: none !important;
-      transition: background 0.2s, transform 0.2s !important;
+      transition: background 0.2s !important;
+      user-select: none !important;
     `;
     openTriggerEl.onmouseenter = () => {
-      openTriggerEl.style.setProperty('background', 'var(--aq-trigger-bg-hover)', 'important');
-      openTriggerEl.style.setProperty('transform', 'translateY(-50%) translateX(-4px)', 'important');
+      if (!isDragging) {
+        openTriggerEl.style.setProperty('background', 'var(--aq-trigger-bg-hover)', 'important');
+        openTriggerEl.style.setProperty('transform', 'translateY(-50%) translateX(-4px)', 'important');
+      }
     };
     openTriggerEl.onmouseleave = () => {
-      openTriggerEl.style.setProperty('background', 'var(--aq-trigger-bg)', 'important');
-      openTriggerEl.style.setProperty('transform', 'translateY(-50%) translateX(0)', 'important');
+      if (!isDragging) {
+        openTriggerEl.style.setProperty('background', 'var(--aq-trigger-bg)', 'important');
+        openTriggerEl.style.setProperty('transform', 'translateY(-50%) translateX(0)', 'important');
+      }
     };
-    openTriggerEl.onclick = openSidebar;
+    openTriggerEl.onclick = (e) => {
+      // 如果正在拖动，不触发打开
+      if (isDragging) return;
+      openSidebar();
+    };
+
+    // 拖动功能
+    openTriggerEl.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      openTriggerEl.style.cursor = 'grabbing';
+      openTriggerEl.style.transition = 'none';
+      const rect = openTriggerEl.getBoundingClientRect();
+      dragOffsetY = e.clientY - rect.top;
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging || !openTriggerEl) return;
+      let newTop = e.clientY - dragOffsetY;
+      // 限制在视口内
+      const minTop = 10;
+      const maxTop = window.innerHeight - openTriggerEl.offsetHeight - 10;
+      newTop = Math.max(minTop, Math.min(maxTop, newTop));
+      openTriggerEl.style.top = newTop + 'px';
+      openTriggerEl.style.transform = 'translateX(0) !important';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging && openTriggerEl) {
+        isDragging = false;
+        openTriggerEl.style.cursor = 'grab';
+        openTriggerEl.style.transition = 'background 0.2s';
+        savePosition();
+      }
+    });
+
+    // 页面滚动时重新应用位置（防止按钮跑偏）
+    window.addEventListener('scroll', () => {
+      if (openTriggerEl && openTriggerEl.style.display === 'block') {
+        // 保持相对位置
+      }
+    });
+
+    // 应用保存的位置
+    applySavedPosition();
     document.body.appendChild(openTriggerEl);
 
     // 组装侧边栏
@@ -482,13 +571,16 @@
   }
 
   /**
-   * 关闭侧边栏（显示打开按钮）
+   * 关闭侧边栏（显示打开按钮，保持拖动位置）
    */
   function closeSidebar() {
     if (!sidebarEl) return;
     sidebarEl.style.display = 'none';
     document.body.style.marginRight = '0';
-    if (openTriggerEl) openTriggerEl.style.display = 'block';
+    if (openTriggerEl) {
+      openTriggerEl.style.display = 'block';
+      applySavedPosition();
+    }
     sidebarVisible = false;
   }
 
@@ -499,7 +591,9 @@
     if (!sidebarEl) return;
     sidebarEl.style.display = 'flex';
     document.body.style.marginRight = CONFIG.SIDEBAR_WIDTH + 'px';
-    if (openTriggerEl) openTriggerEl.style.display = 'none';
+    if (openTriggerEl) {
+      openTriggerEl.style.display = 'none';
+    }
     sidebarVisible = true;
     buildQuestionList();
   }
@@ -539,12 +633,14 @@
     if (!listEl) return;
 
     const selectors = getMessageSelectors();
+    console.log('[AI Question] Using selectors:', selectors);
     let allMessages = [];
     
     // 尝试各种选择器
     for (const selector of selectors) {
       try {
         const elements = document.querySelectorAll(selector);
+        console.log('[AI Question] Selector:', selector, 'found:', elements.length);
         if (elements.length > 0) {
           allMessages = Array.from(elements);
           break;
@@ -721,14 +817,14 @@
           createSidebar();
           buildQuestionList();
           observePage();
-        }, 1500);
+        }, 3000);
       });
     } else {
       setTimeout(() => {
         createSidebar();
         buildQuestionList();
         observePage();
-      }, 1500);
+      }, 3000);
     }
   }
 
